@@ -132,11 +132,18 @@ window.registerUser = async () => {
     window.switchAuthTab('login');
 };
 
+/* ================= REPLACE THIS FUNCTION IN APP.JS ================= */
+
 window.loginUser = () => {
-    const u = document.getElementById('loginUser').value.trim();
+    // OLD CODE (Wrong ID): const u = document.getElementById('loginUser').value.trim();
+    
+    // NEW CODE (Correct ID):
+    const u = document.getElementById('loginEmail').value.trim(); 
     const p = document.getElementById('loginPass').value.trim();
     
-    // Backdoor for testing
+    if (!u || !p) return alert("Please enter Email/Username and Password");
+
+    // 1. Backdoor for Testing (Bina Register kiye check karne ke liye)
     if (u === "student" && p === "student123") {
         currentUser = { username: "student", password: "student123" };
         localStorage.setItem('cHub_currentUser', JSON.stringify(currentUser));
@@ -144,13 +151,16 @@ window.loginUser = () => {
         return;
     }
 
-    const user = appData.users.find(usr => usr.username === u && usr.password === p);
+    // 2. Real Database Check
+    // Note: Hum check kar rahe hain ki kya user ne Email ya Username dala hai
+    const user = appData.users.find(usr => (usr.username === u || usr.email === u) && usr.password === p);
+    
     if(user) {
         currentUser = user;
         localStorage.setItem('cHub_currentUser', JSON.stringify(currentUser));
         window.checkUserLoginStatus();
     } else {
-        alert("Invalid Credentials");
+        alert("Invalid Credentials!");
     }
 };
 
@@ -635,4 +645,5 @@ window.publishGradedResult = async () => {
 };
 
 // Start the app
+
 initApp();
