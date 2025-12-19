@@ -4,7 +4,7 @@ import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gsta
 import { getFirestore, collection, addDoc, doc, deleteDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
 /* ================= CONFIGURATION ================= */
-const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
+const GEMINI_API_KEY = "AIzaSyDzRs8QaqasDy-C32jiClSvtXWP9BHP1iA"; 
 const firebaseConfig = {
     apiKey: "AIzaSyC0VzSG7BctaTLLk93EUxJOaerw-5i4vJo",
     authDomain: "commerce-study-hub.firebaseapp.com",
@@ -647,5 +647,6 @@ window.publishGradedResult = async () => {
 // Start the app
 
 initApp();
+
 
 
