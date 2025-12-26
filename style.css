@@ -19,6 +19,13 @@ nav { background-color: var(--primary); padding: 15px 20px; display: flex; justi
 .nav-right { display: flex; gap: 10px; align-items: center; }
 .hidden { display: none !important; }
 
+/* Animations */
+.fade-in { animation: fadeIn 0.4s ease-out forwards; }
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
 .btn { padding: 10px 20px; border: none; border-radius: 5px; cursor: pointer; font-size: 14px; transition: 0.2s; }
 .btn:hover { opacity: 0.9; transform: translateY(-1px); }
 .btn-small { padding: 5px 10px; font-size: 12px; }
@@ -27,8 +34,10 @@ nav { background-color: var(--primary); padding: 15px 20px; display: flex; justi
 .btn-danger { background-color: var(--danger); color: white; }
 .btn-warning { background-color: var(--warning); color: white; }
 .btn-ai { background-color: var(--ai-color); color: white; }
-.btn-outline { background: transparent; border: 1px solid white; color: white; }
-.btn-outline:hover { background: rgba(255,255,255,0.1); }
+.btn-outline { background: transparent; border: 1px solid var(--secondary); color: var(--secondary); } /* Fixed visibility on white bg */
+nav .btn-outline { border-color: white; color: white; } /* Outline buttons in nav are white */
+.btn-outline:hover { background: rgba(0,0,0,0.05); }
+nav .btn-outline:hover { background: rgba(255,255,255,0.1); }
 
 .container { padding: 20px; max-width: 1000px; margin: 0 auto; }
 .input-field { width: 100%; padding: 10px; margin: 8px 0; border: 1px solid #ddd; border-radius: 4px; }
@@ -41,14 +50,25 @@ nav { background-color: var(--primary); padding: 15px 20px; display: flex; justi
 .spinner { border: 4px solid #f3f3f3; border-top: 4px solid var(--secondary); border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite; margin-bottom: 15px;}
 @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
 
-.auth-box { max-width: 400px; margin: 50px auto; text-align: center; }
+.auth-box { max-width: 900px; margin: 30px auto; background: white; padding: 30px; border-radius: 8px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
+#section-user-auth .auth-box, #section-admin-login .auth-box { max-width: 400px; } /* Smaller box for login */
+
 .tab-row { display: flex; margin-bottom: 20px; }
 .tab-btn { flex: 1; padding: 10px; border: none; background: #eee; cursor: pointer; }
 .tab-btn.active { background: var(--secondary); color: #fff; }
 
-.hero { background: linear-gradient(135deg, #2980b9, #2c3e50); color: #fff; text-align: center; padding: 40px; }
+.hero { background: linear-gradient(135deg, #2980b9, #2c3e50); color: #fff; text-align: center; padding: 40px; border-radius: 0 0 8px 8px; margin-bottom: 20px; }
 .muted { color: #777; }
 .notice { background: #fff3cd; padding: 15px; border-radius: 5px; margin-bottom: 15px; }
+
+/* ================= TABLES (Admin Panel) ================= */
+.table-container { overflow-x: auto; margin-top: 15px; border: 1px solid #eee; border-radius: 8px; }
+table { width: 100%; border-collapse: collapse; min-width: 600px; }
+thead { background-color: var(--primary); color: white; }
+th, td { padding: 12px 15px; text-align: left; border-bottom: 1px solid #eee; font-size: 14px; }
+tbody tr:hover { background-color: #f8f9fa; }
+tbody tr:last-child td { border-bottom: none; }
+td button { margin-right: 5px; }
 
 /* Quiz & Grading */
 .timer-badge { background: var(--primary); color: white; padding: 5px 15px; border-radius: 20px; font-weight: bold; font-family: monospace; font-size: 1.2em; }
@@ -61,8 +81,8 @@ nav { background-color: var(--primary); padding: 15px 20px; display: flex; justi
 .question-preview { background: white; padding: 10px; border-left: 3px solid var(--secondary); margin-bottom: 5px; }
 .grading-card { border-left: 4px solid var(--warning); background: #fffaf0; padding: 15px; margin-bottom: 10px; }
 
-.status-pending { color: var(--warning); font-weight: bold; }
-.status-completed { color: var(--accent); font-weight: bold; }
+.status-pending { color: var(--warning); font-weight: bold; background: #fff3cd; padding: 2px 6px; border-radius: 4px; font-size: 12px; }
+.status-completed { color: var(--accent); font-weight: bold; background: #d4efdf; padding: 2px 6px; border-radius: 4px; font-size: 12px;}
 .report-row { display: flex; justify-content: space-between; padding: 10px; border-bottom: 1px solid #eee; }
 .correct-ans { color: var(--accent); font-weight: bold; }
 .wrong-ans { color: var(--danger); text-decoration: line-through; }
