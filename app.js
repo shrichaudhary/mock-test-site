@@ -1,7 +1,7 @@
 import { initializeApp, getApps } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
 import { getAnalytics } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-analytics.js";
 import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-import { getFirestore, collection, addDoc, doc, deleteDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+import { getFirestore, collection, addDoc, doc, deleteDoc, onSnapshot, setDoc, updateDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
 /* ================= CONFIGURATION ================= */
 const GEMINI_API_KEY = "AIzaSyDzRs8QaqasDy-C32jiClSvtXWP9BHP1iA"; 
@@ -30,7 +30,7 @@ const appId = "commerce-study-hub";
 const getColl = (name) => collection(db, 'artifacts', appId, 'public', 'data', name);
 
 /* ================= STATE MANAGEMENT ================= */
-let appData = { quizzes: [], users: [], pendingReviews: [], publishedResults: [] };
+let appData = { quizzes: [], users: [], pendingReviews: [], publishedResults: [], admins: [] };
 let currentUser = null; 
 let currentQuiz = null;
 let currentQIndex = 0;
@@ -38,6 +38,7 @@ let userResponses = {};
 let timerInterval = null;
 let currentGradingId = null;
 let newQuestionsBuffer = [];
+let quizStartTime = 0; // NEW: Track time
 const ADMIN_USER = "admin";
 const ADMIN_PASS = "admin123";
 
@@ -47,16 +48,18 @@ const hideAll = () => {
         'section-home', 'section-user-auth', 'section-user-dashboard', 
         'section-admin-login', 'section-admin-dashboard', 'section-quiz-creator', 
         'section-instructions', 'section-active-quiz', 'section-admin-grading', 
-        'section-result'
+        'section-result', 'section-admin-students', 'section-student-profile', 'section-manage-admins'
     ];
-    sections.forEach(id => document.getElementById(id).classList.add('hidden'));
+    sections.forEach(id => {
+        const el = document.getElementById(id);
+        if(el) el.classList.add('hidden');
+    });
 };
 
 /* ================= 1. AUTHENTICATION & STARTUP ================= */
 async function initApp() {
     try {
         await signInAnonymously(auth);
-        // Hook to call Spy Engine
         if(window.initSpyMode) window.initSpyMode(); 
     } catch (error) {
         console.error("Auth failed", error);
@@ -85,6 +88,7 @@ function startLiveSync() {
 
     onSnapshot(getColl('users'), (snap) => {
         appData.users = snap.docs.map(d => ({ firestoreId: d.id, ...d.data() }));
+        if(!document.getElementById('section-admin-students').classList.contains('hidden')) window.filterStudents();
     });
 
     onSnapshot(getColl('pending_reviews'), (snap) => {
@@ -96,6 +100,10 @@ function startLiveSync() {
     onSnapshot(getColl('results'), (snap) => {
         appData.publishedResults = snap.docs.map(d => ({ firestoreId: d.id, ...d.data() }));
         if(currentUser) renderUserDashboard();
+    });
+
+    onSnapshot(getColl('admins'), (snap) => {
+        appData.admins = snap.docs.map(d => ({ firestoreId: d.id, ...d.data() }));
     });
 
     const savedUser = localStorage.getItem('cHub_currentUser');
@@ -127,23 +135,19 @@ window.registerUser = async () => {
     if(!e || !u || !p) return alert("Fill all fields");
     if(appData.users.find(user => user.username === u)) return alert("Username taken!");
     
-    await addDoc(getColl('users'), { email: e, username: u, password: p });
+    // Note: Storing password in plain text as requested for admin visibility
+    await addDoc(getColl('users'), { email: e, username: u, password: p, isBlocked: false });
     alert("Registered! Please Login.");
     window.switchAuthTab('login');
 };
 
-/* ================= REPLACE THIS FUNCTION IN APP.JS ================= */
-
 window.loginUser = () => {
-    // OLD CODE (Wrong ID): const u = document.getElementById('loginUser').value.trim();
-    
-    // NEW CODE (Correct ID):
     const u = document.getElementById('loginEmail').value.trim(); 
     const p = document.getElementById('loginPass').value.trim();
     
     if (!u || !p) return alert("Please enter Email/Username and Password");
 
-    // 1. Backdoor for Testing (Bina Register kiye check karne ke liye)
+    // 1. Backdoor for Testing
     if (u === "student" && p === "student123") {
         currentUser = { username: "student", password: "student123" };
         localStorage.setItem('cHub_currentUser', JSON.stringify(currentUser));
@@ -152,10 +156,13 @@ window.loginUser = () => {
     }
 
     // 2. Real Database Check
-    // Note: Hum check kar rahe hain ki kya user ne Email ya Username dala hai
     const user = appData.users.find(usr => (usr.username === u || usr.email === u) && usr.password === p);
     
     if(user) {
+        if(user.isBlocked) {
+            alert("🚫 Access Denied: Your account has been suspended by the Admin.");
+            return;
+        }
         currentUser = user;
         localStorage.setItem('cHub_currentUser', JSON.stringify(currentUser));
         window.checkUserLoginStatus();
@@ -241,8 +248,12 @@ window.toggleAdminAuth = () => {
 };
 
 window.verifyAdmin = () => {
-    if (document.getElementById('adminEmail').value === ADMIN_USER && // Note: Changed ID to match HTML
-        document.getElementById('adminPass').value === ADMIN_PASS) {
+    const u = document.getElementById('adminEmail').value;
+    const p = document.getElementById('adminPass').value;
+
+    const dbAdmin = appData.admins.find(a => a.email === u && a.password === p);
+
+    if ((u === ADMIN_USER && p === ADMIN_PASS) || dbAdmin) {
         if(window.disableSpyMode) window.disableSpyMode();
         window.goToAdminDashboard();
     } else {
@@ -261,12 +272,14 @@ window.goToAdminDashboard = () => {
 };
 
 function renderAdminDashboard() {
+    // 1. Quizzes
     const qList = document.getElementById('admin-quiz-list');
     qList.innerHTML = appData.quizzes.length ? '' : '<p>No active quizzes.</p>';
     appData.quizzes.forEach(q => {
         qList.innerHTML += `<div class="report-row"><span>${q.title}</span> <button class="btn btn-danger" style="padding:2px 8px; font-size:12px;" onclick="window.deleteQuiz('${q.firestoreId}')">Delete</button></div>`;
     });
 
+    // 2. Pending Reviews
     const pList = document.getElementById('pending-eval-list');
     document.getElementById('admin-pending-count').innerText = appData.pendingReviews.length;
     pList.innerHTML = appData.pendingReviews.length ? '' : '<p style="color:#666;">No pending submissions.</p>';
@@ -277,6 +290,24 @@ function renderAdminDashboard() {
                 <button class="btn btn-warning" onclick="window.openGrading('${sub.firestoreId}')">Grade</button>
             </div>`;
     });
+
+    // 3. Management Controls (Inject if not present)
+    const container = document.getElementById('section-admin-dashboard').querySelector('.auth-box');
+    if(!document.getElementById('admin-nav-controls')) {
+        const div = document.createElement('div');
+        div.id = 'admin-nav-controls';
+        div.style.marginTop = "20px";
+        div.style.paddingTop = "20px";
+        div.style.borderTop = "1px solid #ccc";
+        div.innerHTML = `
+            <h3>🛠️ Admin Tools</h3>
+            <div style="display:flex; gap:10px; flex-wrap:wrap;">
+                <button class="btn btn-primary" onclick="window.showStudentManager()">Manage Students</button>
+                <button class="btn btn-outline" onclick="window.showAdminManager()">Manage Admins</button>
+            </div>
+        `;
+        container.appendChild(div);
+    }
 }
 
 window.deleteQuiz = async (fid) => {
@@ -477,6 +508,7 @@ window.initiateQuiz = (fid) => {
 
 window.startTest = () => {
     currentQIndex = 0; userResponses = {};
+    quizStartTime = Date.now(); // START TIMER
     let timeRemaining = currentQuiz.time * 60;
     if(timerInterval) clearInterval(timerInterval);
     timerInterval = setInterval(() => {
@@ -559,8 +591,17 @@ window.changeQuestion = (d) => { currentQIndex+=d; loadQuestion(); };
 
 window.submitTest = async () => {
     clearInterval(timerInterval);
+    const timeTakenSeconds = Math.floor((Date.now() - quizStartTime) / 1000);
+    const timeString = `${Math.floor(timeTakenSeconds/60)}m ${timeTakenSeconds%60}s`;
+    
     const needsGrading = currentQuiz.questions.some(q => q.type === 'text' || q.type === 'image');
-    const submissionData = { studentName: currentUser.username, quizTitle: currentQuiz.title, quizId: currentQuiz.firestoreId, timestamp: Date.now() };
+    const submissionData = { 
+        studentName: currentUser.username, 
+        quizTitle: currentQuiz.title, 
+        quizId: currentQuiz.firestoreId, 
+        timestamp: Date.now(),
+        timeTaken: timeString
+    };
 
     if(needsGrading) {
         await addDoc(getColl('pending_reviews'), { ...submissionData, questions: currentQuiz.questions, responses: userResponses, totalMaxMarks: currentQuiz.totalMarks });
@@ -574,7 +615,15 @@ window.submitTest = async () => {
             if(q.type === 'mcq' && ans === q.correct) correct = true;
             if(q.type === 'msq' && ans && JSON.stringify(ans.sort())===JSON.stringify(q.correct.sort())) correct = true;
             if(correct) score += q.marks;
-            report += `<div class="report-row"><div>Q${i+1}: ${q.text}<br><span class="${correct?'correct-ans':'wrong-ans'}">Your: ${ans||'-'}</span></div><div>${correct?'+'+q.marks:'0'}</div></div>`;
+            
+            // Detailed Report Construction
+            report += `<div class="report-row">
+                <div>Q${i+1}: ${q.text}<br>
+                <span class="${correct?'correct-ans':'wrong-ans'}">Your: ${ans||'-'}</span>
+                ${!correct ? `<br><span style="color:green; font-size:0.8em">Correct: ${q.correct}</span>` : ''}
+                </div>
+                <div>${correct?'+'+q.marks:'0'}</div>
+            </div>`;
         });
         await addDoc(getColl('results'), { ...submissionData, score: score, max: currentQuiz.totalMarks, reportHTML: report });
         hideAll(); document.getElementById('section-result').classList.remove('hidden');
@@ -638,15 +687,161 @@ window.publishGradedResult = async () => {
         score: document.getElementById('grading-total-score').innerText, 
         max: sub.totalMaxMarks, 
         reportHTML: report,
-        timestamp: Date.now()
+        timestamp: Date.now(),
+        timeTaken: sub.timeTaken || "N/A"
     });
     await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'pending_reviews', currentGradingId));
     window.goToAdminDashboard();
 };
 
-// Start the app
+/* ================= 7. ADMIN: STUDENT MANAGEMENT ================= */
+window.showStudentManager = () => {
+    hideAll();
+    document.getElementById('section-admin-students').classList.remove('hidden');
+    window.filterStudents();
+};
+
+window.filterStudents = () => {
+    const query = document.getElementById('student-search').value.toLowerCase();
+    const tbody = document.getElementById('admin-student-list');
+    tbody.innerHTML = "";
+
+    appData.users.forEach(u => {
+        if(u.username.toLowerCase().includes(query) || u.email.toLowerCase().includes(query)) {
+            const isBlocked = u.isBlocked === true;
+            tbody.innerHTML += `
+                <tr style="border-bottom:1px solid #eee;">
+                    <td style="padding:10px;">${u.username}</td>
+                    <td style="padding:10px;">${u.email}</td>
+                    <td style="padding:10px; font-family:monospace; color:#e74c3c;">${u.password}</td>
+                    <td style="padding:10px;">${isBlocked ? '<span style="color:red; font-weight:bold;">BLOCKED</span>' : '<span style="color:green">Active</span>'}</td>
+                    <td style="padding:10px;">
+                        <button class="btn btn-outline" style="font-size:12px; padding:2px 5px;" onclick="window.viewStudentProfile('${u.firestoreId}')">View</button>
+                        <button class="btn ${isBlocked ? 'btn-success' : 'btn-danger'}" style="font-size:12px; padding:2px 5px;" onclick="window.toggleBlockUser('${u.firestoreId}', ${!isBlocked})">
+                            ${isBlocked ? 'Unblock' : 'Block'}
+                        </button>
+                    </td>
+                </tr>
+            `;
+        }
+    });
+};
+
+window.toggleBlockUser = async (uid, blockStatus) => {
+    if(confirm(blockStatus ? "Block this user?" : "Unblock this user?")) {
+        await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'users', uid), { isBlocked: blockStatus }, { merge: true });
+        alert(blockStatus ? "User Blocked!" : "User Activated!");
+    }
+};
+
+window.viewStudentProfile = (uid) => {
+    const user = appData.users.find(u => u.firestoreId === uid);
+    if(!user) return;
+
+    hideAll();
+    document.getElementById('section-student-profile').classList.remove('hidden');
+    document.getElementById('profile-name').innerText = user.username + "'s Profile";
+
+    // Get Student History
+    const history = appData.publishedResults.filter(r => r.studentName === user.username);
+    
+    // Stats
+    document.getElementById('profile-tests-count').innerText = history.length;
+    let avg = 0;
+    if(history.length > 0) {
+        let totalPct = 0;
+        history.forEach(h => totalPct += (h.score / h.max) * 100);
+        avg = (totalPct / history.length).toFixed(1);
+    }
+    document.getElementById('profile-avg-score').innerText = avg + "%";
+
+    // List
+    const list = document.getElementById('profile-history-list');
+    list.innerHTML = history.length ? "" : "<p>No tests taken yet.</p>";
+    
+    history.forEach(h => {
+        const date = h.timestamp ? new Date(h.timestamp).toLocaleDateString() : 'N/A';
+        const timeTaken = h.timeTaken || "N/A";
+        list.innerHTML += `
+            <div class="card" style="margin-bottom:10px; display:flex; justify-content:space-between; align-items:center;">
+                <div>
+                    <h4 style="margin:0">${h.quizTitle}</h4>
+                    <p class="muted" style="margin:0; font-size:0.8em">📅 ${date} | ⏱️ Time: ${timeTaken}</p>
+                </div>
+                <div style="text-align:right;">
+                    <span style="font-weight:bold; font-size:1.2em; color:${(h.score/h.max)>0.4?'#2ecc71':'#e74c3c'}">${h.score}/${h.max}</span>
+                    <br>
+                    <button style="background:none; border:none; color:blue; cursor:pointer; font-size:0.8em;" onclick="window.viewAdminResult('${h.firestoreId}')">View Report</button>
+                </div>
+            </div>
+        `;
+    });
+};
+
+window.viewAdminResult = (fid) => {
+    const res = appData.publishedResults.find(r => r.firestoreId === fid);
+    hideAll();
+    document.getElementById('section-result').classList.remove('hidden');
+    
+    document.getElementById('res-status-title').innerText = "Admin View: " + res.studentName;
+    document.getElementById('res-pending-msg').classList.add('hidden');
+    document.getElementById('res-score-box').classList.remove('hidden');
+    document.getElementById('res-details-card').classList.remove('hidden');
+    document.getElementById('res-score').innerText = res.score;
+    document.getElementById('res-total').innerText = res.max;
+    document.getElementById('detailed-report').innerHTML = res.reportHTML;
+    
+    // Add temporary back button
+    const container = document.getElementById('section-result').querySelector('.auth-box');
+    const existingBack = document.getElementById('temp-admin-back');
+    if(existingBack) existingBack.remove();
+
+    const backBtn = document.createElement('button');
+    backBtn.id = 'temp-admin-back';
+    backBtn.innerText = "Back to Profile";
+    backBtn.className = "btn btn-outline";
+    backBtn.style.marginTop = "20px";
+    backBtn.onclick = () => { 
+        document.getElementById('section-result').classList.add('hidden'); 
+        document.getElementById('section-student-profile').classList.remove('hidden'); 
+    };
+    container.appendChild(backBtn);
+};
+
+/* ================= 8. ADMIN: MANAGE ADMINS ================= */
+window.showAdminManager = () => {
+    hideAll();
+    document.getElementById('section-manage-admins').classList.remove('hidden');
+    renderAdminList();
+};
+
+window.addNewAdmin = async () => {
+    const u = document.getElementById('newAdminEmail').value.trim();
+    const p = document.getElementById('newAdminPass').value.trim();
+    if(!u || !p) return alert("Fill details");
+    
+    await addDoc(getColl('admins'), { email: u, password: p });
+    document.getElementById('newAdminEmail').value = "";
+    document.getElementById('newAdminPass').value = "";
+    alert("Admin Added!");
+};
+
+function renderAdminList() {
+    const div = document.getElementById('admin-list-display');
+    div.innerHTML = "<h4>Current Admins:</h4>";
+    appData.admins.forEach(a => {
+        div.innerHTML += `
+            <div style="display:flex; justify-content:space-between; border-bottom:1px solid #eee; padding:5px;">
+                <span>${a.email}</span>
+                <button style="color:red; background:none; border:none; cursor:pointer;" onclick="window.removeAdmin('${a.firestoreId}')">Remove</button>
+            </div>`;
+    });
+}
+
+window.removeAdmin = async (fid) => {
+    if(confirm("Remove this admin?")) {
+        await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'admins', fid));
+    }
+};
 
 initApp();
-
-
-
