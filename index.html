@@ -112,6 +112,16 @@
                 <button class="btn btn-danger" onclick="window.logoutAdmin()">Logout</button>
             </div>
         </div>
+        
+        <!-- NEW: Management Controls Added Here -->
+        <div class="card">
+            <h3>🛠️ Management Controls</h3>
+            <div class="row">
+                <button class="btn btn-primary" onclick="window.showStudentManager()">Manage Students</button>
+                <button class="btn btn-outline" style="color:#333; border-color:#333;" onclick="window.showAdminManager()">Manage Admins</button>
+            </div>
+        </div>
+
         <div class="card warn-border">
             <h3>⚠️ Global Pending Evaluations (<span id="admin-pending-count">0</span>)</h3>
             <p class="muted">Submissions from all students appear here instantly.</p>
@@ -120,6 +130,82 @@
         <div class="card">
             <h3>Active Quizzes (Cloud)</h3>
             <div id="admin-quiz-list"></div>
+        </div>
+    </div>
+
+    <!-- ================= SECTION: ADMIN STUDENT MANAGEMENT ================= -->
+    <div id="section-admin-students" class="container hidden fade-in">
+        <div class="card">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
+                <h2>🎓 Student Management</h2>
+                <button class="btn btn-outline" style="color:#333; border-color:#333;" onclick="window.goToAdminDashboard()">Back to Dashboard</button>
+            </div>
+            
+            <input type="text" id="student-search" class="input-field" placeholder="Search by username or email..." onkeyup="window.filterStudents()">
+
+            <div class="table-container">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Username</th>
+                            <th>Email</th>
+                            <th>Password</th>
+                            <th>Status</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="admin-student-list">
+                        <!-- Populated by JS -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- ================= SECTION: SPECIFIC STUDENT PROFILE ================= -->
+    <div id="section-student-profile" class="container hidden fade-in">
+        <div class="auth-box">
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+                <h2 id="profile-name">Student Name</h2>
+                <button class="btn btn-outline" style="color:#333; border-color:#333;" onclick="window.showStudentManager()">Back to List</button>
+            </div>
+            <hr>
+            
+            <div style="display:flex; gap:15px; margin-bottom:20px;">
+                <div class="card" style="flex:1; text-align:center; box-shadow:none; border:1px solid #eee;">
+                    <h3>Tests Taken</h3>
+                    <h1 id="profile-tests-count" style="color:#2ecc71">0</h1>
+                </div>
+                <div class="card" style="flex:1; text-align:center; box-shadow:none; border:1px solid #eee;">
+                    <h3>Avg Score</h3>
+                    <h1 id="profile-avg-score" style="color:#3498db">0%</h1>
+                </div>
+            </div>
+
+            <h3>📝 Quiz History</h3>
+            <div id="profile-history-list" style="margin-top:10px;">
+                <!-- History Items go here -->
+            </div>
+        </div>
+    </div>
+
+    <!-- ================= SECTION: ADMIN MANAGERS ================= -->
+    <div id="section-manage-admins" class="container hidden fade-in">
+        <div class="auth-box">
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+                <h2>🛡️ Manage Admins</h2>
+                <button class="btn btn-outline" style="color:#333; border-color:#333;" onclick="window.goToAdminDashboard()">Back</button>
+            </div>
+            
+            <div style="display:flex; gap:10px; margin-top:20px;">
+                <input type="text" id="newAdminEmail" class="input-field" placeholder="New Admin Email/ID">
+                <input type="text" id="newAdminPass" class="input-field" placeholder="Password">
+                <button class="btn btn-primary" onclick="window.addNewAdmin()">Add</button>
+            </div>
+
+            <div id="admin-list-display" style="margin-top:20px;">
+                <!-- List of admins -->
+            </div>
         </div>
     </div>
 
